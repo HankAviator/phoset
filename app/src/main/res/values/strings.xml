@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PhoSet</string>
+    <string name="settings_title">PhoSet</string>
+    <string name="settings_subtitle">Google Photos tweaks</string>
+    <string name="features_heading">Features</string>
+    <string name="geo_title">Coordinate links</string>
+    <string name="geo_description">Open photo locations as precise pins in any compatible map app.</string>
+    <string name="sync_title">Reconcile device changes</string>
+    <string name="sync_description">Silently accept recognized edits, trash, restore, delete, and Locked Folder changes.</string>
+    <string name="trash_title">Skip trash confirmation</string>
+    <string name="trash_description">Move selected photos and videos to trash without Google Photos’ confirmation screen.</string>
+    <string name="settings_note">Switch changes apply immediately. After enabling or updating PhoSet in LSPosed, force-stop and reopen Google Photos.</string>
+    <string name="back">Back</string>
+</resources>
