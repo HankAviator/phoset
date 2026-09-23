@@ -7,9 +7,10 @@ Each feature has its own switch in a Material 3 Expressive settings screen.
 
 - **Coordinate links** normalizes exact coordinate intents from Google Photos
   into interoperable `geo:` links while preserving a visible map pin.
-- **Reconcile device changes** silently accepts recognized Google Photos
+- **Reconcile device changes** automatically applies recognized Google Photos
   out-of-sync `EDIT`, `TRASH`, `RESTORE`, `DELETE`, and `VAULT` changes through
-  Photos' own reconciliation paths.
+  Photos' own review controls. PhoSet briefly opens the review screen while
+  Photos processes the changes.
 - **Skip trash confirmation** activates Google Photos' real positive action for
   identified move-to-trash dialogs, without bypassing Android or ROM permission
   prompts.
@@ -26,14 +27,15 @@ through LSPosed's API 93 preferences bridge.
 ## Update resilience
 
 The coordinate fix hooks an Android framework boundary and does not depend on
-Photos class names. Trash confirmations are recognized using resource entry
-names rather than obfuscated Java symbols. The reconciliation feature validates
-its required runtime classes, signatures, category mappings, MediaStore URI
-shapes, and item state before acting. Unknown or changed structures retain the
-stock Google Photos behavior.
+Photos class names. Trash confirmations and out-of-sync review controls are
+recognized using resource names and localized strings rather than obfuscated
+Java symbols. The reconciliation feature checks the review category, action,
+and batch size before pressing Photos' own action button. Unknown or changed
+review cards remain available for manual review.
 
 Development and trash-dialog analysis used Google Photos
-`7.91.0.973540846`.
+`7.91.0.973540846`. The resource-based reconciliation flow was checked against
+Google Photos `7.93.0.982110057`.
 
 ## Install
 

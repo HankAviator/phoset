@@ -14,7 +14,7 @@ public final class PhoSetModule implements IXposedHookLoadPackage {
         }
 
         GeoIntentFix.install();
-        ReconciliationController.install(loadPackageParam.classLoader);
+        OutOfSyncUiReconciler.install();
         TrashConfirmationBypass.install(loadPackageParam.classLoader);
     }
 }
