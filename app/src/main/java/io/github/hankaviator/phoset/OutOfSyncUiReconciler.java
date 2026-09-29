@@ -68,6 +68,15 @@ final class OutOfSyncUiReconciler {
                         }
                         param.args[0] = View.GONE;
                     }
+
+                    @Override
+                    protected void afterHookedMethod(MethodHookParam param) {
+                        View view = (View) param.thisObject;
+                        if ((int) param.args[0] == View.VISIBLE
+                                && hasResourceName(view, "empty_page_title_bottom")) {
+                            view.postDelayed(() -> finishEmptyAutomaticReview(view), 250L);
+                        }
+                    }
                 });
         XposedHelpers.findAndHookMethod(View.class, "onAttachedToWindow",
                 new XC_MethodHook() {
@@ -157,7 +166,12 @@ final class OutOfSyncUiReconciler {
         log("applying Photos review action: " + title.getText() + " (" + count + ")");
         if (!button.performClick()) {
             CLICKED_BUTTONS.remove(button);
+            actionsThisReview--;
             log("Photos review button did not accept the click");
+        } else {
+            // Photos may reuse its empty-state view after the media permission flow.
+            // Keep checking for the completed state rather than relying on attachment.
+            watchForCompletedReview(activity, 0);
         }
     }
 
@@ -220,14 +234,34 @@ final class OutOfSyncUiReconciler {
 
     private static void finishEmptyAutomaticReview(View emptyTitle) {
         long started = automaticReviewStarted;
-        if (started == 0L || SystemClock.elapsedRealtime() - started > REVIEW_WINDOW_MS) {
+        if (started == 0L || actionsThisReview == 0
+                || SystemClock.elapsedRealtime() - started > REVIEW_WINDOW_MS
+                || !emptyTitle.isShown()) {
             return;
         }
         Activity activity = activityFrom(emptyTitle.getContext());
-        if (activity != null && activity.getClass().getName().contains(".outofsync.ui.")) {
+        if (activity != null && activity.hasWindowFocus()
+                && activity.getClass().getName().contains(".outofsync.ui.")) {
             automaticReviewStarted = 0L;
             activity.finish();
+            activity.overridePendingTransition(0, 0);
         }
+    }
+
+    private static void watchForCompletedReview(Activity activity, int attempt) {
+        if (attempt >= 60 || activity.isFinishing() || activity.isDestroyed()
+                || automaticReviewStarted == 0L
+                || SystemClock.elapsedRealtime() - automaticReviewStarted > REVIEW_WINDOW_MS) {
+            return;
+        }
+        View decor = activity.getWindow().getDecorView();
+        int emptyTitleId = resourceId(decor, "empty_page_title_bottom");
+        View emptyTitle = emptyTitleId == 0 ? null : decor.findViewById(emptyTitleId);
+        if (emptyTitle != null && emptyTitle.isShown() && activity.hasWindowFocus()) {
+            finishEmptyAutomaticReview(emptyTitle);
+            return;
+        }
+        decor.postDelayed(() -> watchForCompletedReview(activity, attempt + 1), 500L);
     }
 
     private static Activity activityFrom(Context context) {

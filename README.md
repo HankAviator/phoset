@@ -10,7 +10,9 @@ Each feature has its own switch in a Material 3 Expressive settings screen.
 - **Reconcile device changes** automatically applies recognized Google Photos
   out-of-sync `EDIT`, `TRASH`, `RESTORE`, `DELETE`, and `VAULT` changes through
   Photos' own review controls. PhoSet briefly opens the review screen while
-  Photos processes the changes.
+  Photos processes the changes, then closes it once Photos shows the completed
+  empty state. If Photos cannot complete an action, the review stays visible
+  for manual attention.
 - **Skip trash confirmation** activates Google Photos' real positive action for
   identified move-to-trash dialogs, without bypassing Android or ROM permission
   prompts.
