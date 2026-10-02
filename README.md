@@ -12,7 +12,8 @@ Each feature has its own switch in a Material 3 Expressive settings screen.
   Photos' own review controls. PhoSet briefly opens the review screen while
   Photos processes the changes, then closes it once Photos shows the completed
   empty state. If Photos cannot complete an action, the review stays visible
-  for manual attention.
+  for manual attention. Recognized batches have no 100-photo limit; large batches
+  are handled by Photos' own action and allowed up to five minutes to complete.
 - **Skip trash confirmation** activates Google Photos' real positive action for
   identified move-to-trash dialogs, without bypassing Android or ROM permission
   prompts.
@@ -32,12 +33,14 @@ The coordinate fix hooks an Android framework boundary and does not depend on
 Photos class names. Trash confirmations and out-of-sync review controls are
 recognized using resource names and localized strings rather than obfuscated
 Java symbols. The reconciliation feature checks the review category, action,
-and batch size before pressing Photos' own action button. Unknown or changed
-review cards remain available for manual review.
+and a valid positive photo count before pressing Photos' own action button.
+Unknown or changed review cards remain available for manual review.
 
 Development and trash-dialog analysis used Google Photos
 `7.91.0.973540846`. The resource-based reconciliation flow was checked against
-Google Photos `7.93.0.982110057`.
+Google Photos `7.93.0.982110057` and `7.94.0.988717361`. PhoSet `0.1.3` was
+verified on a real 106-photo pending-trash batch: Photos applied the action,
+the review closed automatically, and reopening it showed no pending changes.
 
 ## Install
 

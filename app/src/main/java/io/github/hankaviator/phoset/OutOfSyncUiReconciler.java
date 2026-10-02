@@ -24,8 +24,7 @@ import de.robv.android.xposed.XposedHelpers;
 final class OutOfSyncUiReconciler {
     private static final String TAG = "PhoSetSync";
     private static final String PHOTOS = "com.google.android.apps.photos";
-    private static final int MAX_BATCH = 100;
-    private static final long REVIEW_WINDOW_MS = 30_000L;
+    private static final long REVIEW_WINDOW_MS = 5 * 60_000L;
     private static final Map<View, Boolean> SCHEDULED_CHIPS =
             Collections.synchronizedMap(new WeakHashMap<>());
     private static final Map<View, Boolean> VISIBILITY_FALLBACK =
@@ -97,7 +96,8 @@ final class OutOfSyncUiReconciler {
                         }
                     }
                 });
-        XposedBridge.log(TAG + ": resource-based review controls installed");
+        XposedBridge.log(TAG + ": resource-based review controls installed ("
+                + BuildConfig.VERSION_NAME + ")");
     }
 
     private static boolean isReviewChip(View view) {
@@ -156,9 +156,19 @@ final class OutOfSyncUiReconciler {
             log("unknown review card; action left for manual review");
             return;
         }
-        int count = firstCount(message.getText());
-        if (count < 1 || count > MAX_BATCH || actionsThisReview >= CARDS.length) {
-            log("review card count is missing or exceeds safety cap: " + count);
+        long count = ReviewCountParser.firstCount(message.getText());
+        if (count < 1) {
+            log("review card count is missing or invalid: " + count);
+            return;
+        }
+        // An automatically handled review can also be opened from another Photos entry point.
+        if (automaticReviewStarted == 0L
+                || SystemClock.elapsedRealtime() - automaticReviewStarted > REVIEW_WINDOW_MS) {
+            automaticReviewStarted = SystemClock.elapsedRealtime();
+            actionsThisReview = 0;
+        }
+        if (actionsThisReview >= CARDS.length) {
+            log("review action limit reached; remaining cards left for manual review");
             return;
         }
         CLICKED_BUTTONS.put(button, true);
@@ -171,7 +181,7 @@ final class OutOfSyncUiReconciler {
         } else {
             // Photos may reuse its empty-state view after the media permission flow.
             // Keep checking for the completed state rather than relying on attachment.
-            watchForCompletedReview(activity, 0);
+            watchForCompletedReview(activity);
         }
     }
 
@@ -208,30 +218,6 @@ final class OutOfSyncUiReconciler {
         return false;
     }
 
-    private static int firstCount(CharSequence message) {
-        if (message == null) {
-            return -1;
-        }
-        int count = 0;
-        boolean found = false;
-        for (int index = 0; index < message.length();) {
-            int codePoint = Character.codePointAt(message, index);
-            index += Character.charCount(codePoint);
-            int digit = Character.digit(codePoint, 10);
-            if (digit >= 0) {
-                found = true;
-                count = count * 10 + digit;
-                if (count > MAX_BATCH) {
-                    return count;
-                }
-            } else if (found && codePoint != ',' && codePoint != '.'
-                    && codePoint != ' ' && codePoint != 0x202f) {
-                break;
-            }
-        }
-        return found ? count : -1;
-    }
-
     private static void finishEmptyAutomaticReview(View emptyTitle) {
         long started = automaticReviewStarted;
         if (started == 0L || actionsThisReview == 0
@@ -243,13 +229,14 @@ final class OutOfSyncUiReconciler {
         if (activity != null && activity.hasWindowFocus()
                 && activity.getClass().getName().contains(".outofsync.ui.")) {
             automaticReviewStarted = 0L;
+            log("Photos review completed; closing automatic review");
             activity.finish();
             activity.overridePendingTransition(0, 0);
         }
     }
 
-    private static void watchForCompletedReview(Activity activity, int attempt) {
-        if (attempt >= 60 || activity.isFinishing() || activity.isDestroyed()
+    private static void watchForCompletedReview(Activity activity) {
+        if (activity.isFinishing() || activity.isDestroyed()
                 || automaticReviewStarted == 0L
                 || SystemClock.elapsedRealtime() - automaticReviewStarted > REVIEW_WINDOW_MS) {
             return;
@@ -261,7 +248,7 @@ final class OutOfSyncUiReconciler {
             finishEmptyAutomaticReview(emptyTitle);
             return;
         }
-        decor.postDelayed(() -> watchForCompletedReview(activity, attempt + 1), 500L);
+        decor.postDelayed(() -> watchForCompletedReview(activity), 500L);
     }
 
     private static Activity activityFrom(Context context) {

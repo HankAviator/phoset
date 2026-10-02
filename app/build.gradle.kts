@@ -14,8 +14,8 @@ android {
         applicationId = "io.github.hankaviator.phoset"
         minSdk = 32
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.1.2"
+        versionCode = 4
+        versionName = "0.1.3"
     }
 
     buildTypes {
