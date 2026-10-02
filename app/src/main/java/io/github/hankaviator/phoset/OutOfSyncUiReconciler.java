@@ -12,6 +12,7 @@ import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.widget.TextView;
 
+import java.lang.ref.WeakReference;
 import java.util.Collections;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -33,6 +34,7 @@ final class OutOfSyncUiReconciler {
             Collections.synchronizedMap(new WeakHashMap<>());
     private static volatile long automaticReviewStarted;
     private static volatile int actionsThisReview;
+    private static WeakReference<View> automaticChip = new WeakReference<>(null);
 
     private static final String[][] CARDS = {
             {"photos_outofsync_ui_edited_title",
@@ -50,6 +52,7 @@ final class OutOfSyncUiReconciler {
     private OutOfSyncUiReconciler() {}
 
     static void install() {
+        AutomaticReviewWindow.install();
         XposedHelpers.findAndHookMethod(View.class, "setVisibility", int.class,
                 new XC_MethodHook() {
                     @Override
@@ -121,7 +124,8 @@ final class OutOfSyncUiReconciler {
         }
         automaticReviewStarted = SystemClock.elapsedRealtime();
         actionsThisReview = 0;
-        if (!chip.performClick()) {
+        automaticChip = new WeakReference<>(chip);
+        if (!AutomaticReviewWindow.clickChip(chip)) {
             automaticReviewStarted = 0L;
             restoreChip(chip);
         }
@@ -147,6 +151,7 @@ final class OutOfSyncUiReconciler {
         View card = findCard(button);
         if (card == null) {
             log("review card structure changed; action left for manual review");
+            AutomaticReviewWindow.leaveForManualReview(activity, "review card structure changed");
             return;
         }
         TextView title = card.findViewById(resourceId(button, "card_title"));
@@ -154,11 +159,13 @@ final class OutOfSyncUiReconciler {
         if (title == null || message == null || !(button instanceof TextView)
                 || !isKnownCard(title, (TextView) button)) {
             log("unknown review card; action left for manual review");
+            AutomaticReviewWindow.leaveForManualReview(activity, "unknown review card");
             return;
         }
         long count = ReviewCountParser.firstCount(message.getText());
         if (count < 1) {
             log("review card count is missing or invalid: " + count);
+            AutomaticReviewWindow.leaveForManualReview(activity, "review count unavailable");
             return;
         }
         // An automatically handled review can also be opened from another Photos entry point.
@@ -169,6 +176,7 @@ final class OutOfSyncUiReconciler {
         }
         if (actionsThisReview >= CARDS.length) {
             log("review action limit reached; remaining cards left for manual review");
+            AutomaticReviewWindow.leaveForManualReview(activity, "review action limit reached");
             return;
         }
         CLICKED_BUTTONS.put(button, true);
@@ -178,6 +186,7 @@ final class OutOfSyncUiReconciler {
             CLICKED_BUTTONS.remove(button);
             actionsThisReview--;
             log("Photos review button did not accept the click");
+            AutomaticReviewWindow.leaveForManualReview(activity, "Photos did not accept the action");
         } else {
             // Photos may reuse its empty-state view after the media permission flow.
             // Keep checking for the completed state rather than relying on attachment.
@@ -220,13 +229,15 @@ final class OutOfSyncUiReconciler {
 
     private static void finishEmptyAutomaticReview(View emptyTitle) {
         long started = automaticReviewStarted;
-        if (started == 0L || actionsThisReview == 0
+        Activity activity = activityFrom(emptyTitle.getContext());
+        boolean hidden = activity != null && AutomaticReviewWindow.isHidden(activity);
+        if (started == 0L || (actionsThisReview == 0 && !hidden)
+                || (actionsThisReview == 0 && SystemClock.elapsedRealtime() - started < 5000L)
                 || SystemClock.elapsedRealtime() - started > REVIEW_WINDOW_MS
                 || !emptyTitle.isShown()) {
             return;
         }
-        Activity activity = activityFrom(emptyTitle.getContext());
-        if (activity != null && activity.hasWindowFocus()
+        if (activity != null && AutomaticReviewWindow.canFinish(activity)
                 && activity.getClass().getName().contains(".outofsync.ui.")) {
             automaticReviewStarted = 0L;
             log("Photos review completed; closing automatic review");
@@ -235,7 +246,22 @@ final class OutOfSyncUiReconciler {
         }
     }
 
-    private static void watchForCompletedReview(Activity activity) {
+    static void onAutomaticReviewCreated() {
+        automaticReviewStarted = SystemClock.elapsedRealtime();
+        actionsThisReview = 0;
+    }
+
+    static void onAutomaticReviewAbandoned() {
+        automaticReviewStarted = 0L;
+        actionsThisReview = 0;
+        View chip = automaticChip.get();
+        automaticChip.clear();
+        if (chip != null) {
+            chip.postDelayed(() -> restoreChip(chip), 250L);
+        }
+    }
+
+    static void watchForCompletedReview(Activity activity) {
         if (activity.isFinishing() || activity.isDestroyed()
                 || automaticReviewStarted == 0L
                 || SystemClock.elapsedRealtime() - automaticReviewStarted > REVIEW_WINDOW_MS) {
@@ -244,9 +270,11 @@ final class OutOfSyncUiReconciler {
         View decor = activity.getWindow().getDecorView();
         int emptyTitleId = resourceId(decor, "empty_page_title_bottom");
         View emptyTitle = emptyTitleId == 0 ? null : decor.findViewById(emptyTitleId);
-        if (emptyTitle != null && emptyTitle.isShown() && activity.hasWindowFocus()) {
+        if (emptyTitle != null && emptyTitle.isShown() && AutomaticReviewWindow.canFinish(activity)) {
             finishEmptyAutomaticReview(emptyTitle);
-            return;
+            if (automaticReviewStarted == 0L) {
+                return;
+            }
         }
         decor.postDelayed(() -> watchForCompletedReview(activity), 500L);
     }
@@ -282,7 +310,7 @@ final class OutOfSyncUiReconciler {
         }
     }
 
-    private static void log(String message) {
+    static void log(String message) {
         Log.i(TAG, message);
         XposedBridge.log(TAG + ": " + message);
     }

@@ -9,10 +9,12 @@ Each feature has its own switch in a Material 3 Expressive settings screen.
   into interoperable `geo:` links while preserving a visible map pin.
 - **Reconcile device changes** automatically applies recognized Google Photos
   out-of-sync `EDIT`, `TRASH`, `RESTORE`, `DELETE`, and `VAULT` changes through
-  Photos' own review controls. PhoSet briefly opens the review screen while
-  Photos processes the changes, then closes it once Photos shows the completed
-  empty state. If Photos cannot complete an action, the review stays visible
-  for manual attention. Recognized batches have no 100-photo limit; large batches
+  Photos' own review controls in an invisible, transparent window. Your Photos
+  screen stays visible and can receive taps while changes are applied. The
+  automatic review closes when Photos shows the completed empty state. If an
+  action is unrecognized, unavailable, or times out, PhoSet closes its invisible
+  window and retains the review chip for manual attention. Recognized batches
+  have no 100-photo limit; large batches
   are handled by Photos' own action and allowed up to five minutes to complete.
 - **Skip trash confirmation** activates Google Photos' real positive action for
   identified move-to-trash dialogs, without bypassing Android or ROM permission
@@ -41,6 +43,9 @@ Development and trash-dialog analysis used Google Photos
 Google Photos `7.93.0.982110057` and `7.94.0.988717361`. PhoSet `0.1.3` was
 verified on a real 106-photo pending-trash batch: Photos applied the action,
 the review closed automatically, and reopening it showed no pending changes.
+PhoSet `0.1.4` adds the invisible automatic-review window. Its launch was recorded
+and checked frame by frame on the same device, and touch passthrough was checked
+while the window was active. Manually opened reviews retain their normal display.
 
 ## Install
 
